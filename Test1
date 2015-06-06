@@ -1,0 +1,196 @@
+ clear all;
+ close all;
+
+ % Agent based model of the Ebola spread
+ % Set up the system
+ % Set parameter values
+
+ %The grid is like in the figure, the relative sizes are to reflect the real
+ %population.
+
+ N=440;
+ M=500;              % Grid size (NxM)
+ total = N*M;
+
+ encounters = 10; %how many encounters does an agent have in a day
+ range = 30; %how much in X and Y can the agent move
+
+ betaG=0.002;          % Infection rate
+ betaSL = 0.007;      
+ betaL = 0.009;
+ %Let's set gamma = delta = 1/2 time = 0.05 
+ gammaG = 0.01;         % Immunity rate
+ gammaSL = 0.01;
+ gammaL = 0.01;
+ 
+ deltaG = 0.04;       % Probability of death if infected
+ deltaSL = 0.04;
+ deltaL = 0.03;
+ 
+ % define grid. In the beginning everyone is susceptible
+ x = zeros(N, M);    % The grid x, is coded as:  0=Susceptible, 1=Infected, 2=Removed (Immune), 3=Dead
+
+ % Set borders
+ YG = int32(N*2.4/4.4); %If coordinate is less than YG, the agent is in Guinea
+ XS = int32(M*3/5); %If y coordinate is more than YG and X less that XS, the agent is in Sierra Leone. If X is more than XS - agent is in Liberia
+
+
+ % Now need to say who is initially ill
+ %---------------- Say 16 people,
+ x(YG - 2 , XS:(XS+4) )=1;
+ x(YG -1 , XS:(XS+4) )=1;
+ x(YG , XS:(XS+4) )=1;
+ x(YG+1,XS:(XS+4))=1;
+ % Create a new figure
+ figure
+
+ % Create depository for time series
+ timeser = [];
+ timeserG = [];
+ timeserSL = [];
+ timeserL = [];
+
+ % Create the indexes
+ indexes = [];
+ for i = 1:N
+		for j = 1:M
+			temp = [i j];
+			indexes = [indexes; temp];
+        end
+ end
+%'indexes created'
+%'starting main loop'
+% main loop, iterating the time variable, t
+ for t=1:500
+    
+    % make a random set of XN,XM
+    % iterate over all cells in grid x, for index i=1..N and j=1..M. But want to do it in a random way every time to avoid any fake signals
+
+%shuffle the indexes
+  p = randperm(total);
+
+  for i = 1:total;
+  ag = p(i);
+  % identify the current agent
+  Ycu = indexes (ag,1);
+  Xcu = indexes (ag,2);
+  
+  %'time'
+  %t
+  %'agent'
+  %i
+  
+  % Assign the appropriate probabilities depending on the location
+  if Ycu <= YG
+      betacur = betaG;
+      gamma = gammaG;
+      delta = deltaG;
+  elseif Ycu > YG && Xcu < XS
+      betacur = betaSL;
+      gamma = gammaSL;
+      delta = deltaSL;
+  else
+      betacur = betaL;
+      gamma = gammaL;
+      delta = deltaL;
+  end
+
+                    % If infected => Recover from disease with probability gamma
+                    if ( x(Ycu,Xcu)==1 && rand<gamma )
+                       x(Ycu,Xcu) = 2;
+                    end
+
+                    % If infected => Dead with probability delta
+                    if ( x(Ycu,Xcu)==1 && rand<delta )
+                        x(Ycu,Xcu) = 3;
+                    end
+
+  % Who rhe agent encounters is random within his range of action
+
+  for enc = 1:encounters
+    % who will the agent encounter
+    Yco = Ycu + randi(2*range,1,1) - range;
+    Xco = Xcu + randi(2*range,1,1) - range;
+
+                % Check that the cell is within the grid boundaries
+                if ( Yco>=1 && Xco>=1 && Yco<=N && Xco<=N )
+                    % if cell is in state Susceptible and neighboring cell
+                    % Infected => Spread infection with probability beta
+                    if ( x(Ycu,Xcu)==0 && x(Yco, Xco)==1 )
+                        if ( rand<betacur )
+                            x(Ycu,Xcu) = 1;
+                        end
+                    end
+                    
+               end
+
+  end
+ end
+    
+    % Collect data for time series analysis
+    Number_suscep = sum(sum(x==0));
+    Number_infect = sum(sum(x==1));
+    Number_immune = sum(sum(x==2));
+    Number_dead = sum(sum(x==3));
+    timeser = [timeser; t Number_suscep Number_infect Number_immune Number_dead];
+
+    xG = x(1:YG,:);
+    % Collect data for time series analysis
+    Number_suscepG = sum(sum(xG==0));
+    Number_infectG = sum(sum(xG==1));
+    Number_immuneG = sum(sum(xG==2));
+    Number_deadG = sum(sum(xG==3));
+    timeserG = [timeserG; t Number_suscepG Number_infectG Number_immuneG Number_deadG];
+    
+    xSL = x(YG+1:N,1:XS);
+    % Collect data for time series analysis
+    Number_suscep = sum(sum(xSL==0));
+    Number_infect = sum(sum(xSL==1));
+    Number_immune = sum(sum(xSL==2));
+    Number_dead = sum(sum(xSL==3));
+    timeserSL = [timeserSL; t Number_suscep Number_infect Number_immune Number_dead];
+    
+    xL = x(YG+1:N,XS+1:M);
+    % Collect data for time series analysis
+    Number_suscep = sum(sum(xL==0));
+    Number_infect = sum(sum(xL==1));
+    Number_immune = sum(sum(xL==2));
+    Number_dead = sum(sum(xL==3));
+    timeserL = [timeserL; t Number_suscep Number_infect Number_immune Number_dead];
+    
+    %Animate
+    %clf                                 % Clear figure
+    %imagesc(x, [0 3])                   % Display grid
+    %pause(0.01)                         % Pause for 0.01 s
+    %colormap([1 0 0; 0 1 0; 0 0 1; 0 0 0]);    % Define colors: Red, Green, Blue, black
+    
+    %If no more infected => Stop the simulation
+    if ( sum(x==1)==0 )
+        break;
+    end
+
+ end
+ t
+ figure
+plot(timeser(:,1),timeser(:,5));
+hold on;
+plot(timeser(:,1),timeserG(:,5),'k');
+plot(timeser(:,1),timeserSL(:,5),'r');
+plot(timeser(:,1),timeserL(:,5),'g');
+
+figure
+plot(timeser(:,1),(timeser(:,5)+timeser(:,4)));
+hold on;
+plot(timeser(:,1),(timeserG(:,5)+timeserG(:,4)),'k');
+plot(timeser(:,1),(timeserSL(:,5)+timeserSL(:,4)),'r');
+plot(timeser(:,1),(timeserL(:,5)+timeserL(:,4)),'g');
+
+figure
+imagesc(x, [0 3])                   % Display grid
+pause(0.01)                         % Pause for 0.01 s
+colormap([1 0 0; 0 1 0; 0 0 1; 0 0 0]); 
+
+save timeser
+save timeserG
+save timeserSL
+save timeserL
